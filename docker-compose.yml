@@ -1,0 +1,43 @@
+version: '2'
+
+services:
+    db:
+        container_name: kiwi_db
+        image: postgres:13
+        volumes:
+            - ./db_data:/var/lib/postgresql/data:Z
+        restart: always
+        ports:
+            - 5432:5432
+        environment:
+            POSTGRES_DB: kiwi
+            POSTGRES_USER: kiwi
+            POSTGRES_PASSWORD: kiwi
+
+    web:
+        container_name: kiwi_web
+        depends_on:
+            - db
+        restart: always
+        image: harbor.shopeemobile.com/shopee-data/kiwi:${KIWI_VERSION}
+        ports:
+            - 9080:8080
+            - 9443:8443
+        volumes:
+            - ./uploads:/Kiwi/uploads:Z
+        environment:
+            DEBUG: "true"
+            KIWI_USE_TZ: "true"
+            KIWI_TIME_ZONE: Asia/Singapore
+            KIWI_DONT_ENFORCE_HTTPS: "true"
+            KIWI_DISABLE_BUGTRACKER: "true"
+            KIWI_DB_ENGINE: django.db.backends.postgresql
+            KIWI_DB_HOST: db
+            KIWI_DB_PORT: 5432
+            KIWI_DB_NAME: kiwi
+            KIWI_DB_USER: kiwi
+            KIWI_DB_PASSWORD: kiwi
+
+volumes:
+    db_data:
+    uploads:

@@ -1,0 +1,17 @@
+{% extends "registration/login.html" %}
+
+{% load i18n %}
+{% load static %}
+
+{% block custom_login %}
+<div>
+    <p>
+        {% trans "or Continue With" %}
+    </p>
+
+    <a href="{% url 'social:begin' 'google-oauth2' %}">
+        <img src="{% static 'images/google-oauth.png' %}"  alt="login" title="login">
+    </a>
+
+</div>
+{% endblock %}

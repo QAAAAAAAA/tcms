@@ -1,0 +1,39 @@
+name: code
+
+staging:
+    enable_multiple_branch: true
+    deploy_host:
+        - 10.214.36.193
+    dest_dir: /home/jenkins/work/staging/kiwi
+    include_files:
+        - docker-compose.yml
+    before_script:
+        - sh update_auth_key.sh -e staging
+        - timeout 60 docker rmi kiwi:latest || true
+        - make docker-image
+        - docker tag kiwi:latest harbor.shopeemobile.com/shopee-data/kiwi:$PAYLOAD.commit_hash
+        - docker push harbor.shopeemobile.com/shopee-data/kiwi:$PAYLOAD.commit_hash
+    after_script:
+        - docker stop kiwi_web && docker rm kiwi_web
+        - docker stop kiwi_db && docker rm kiwi_db
+        - KIWI_VERSION=$PAYLOAD.commit_hash docker-compose pull
+        - KIWI_VERSION=$PAYLOAD.commit_hash docker-compose up -d
+
+master:
+    enable_multiple_branch: true
+    deploy_host:
+        - 10.214.35.193
+    dest_dir: /home/jenkins/work/kiwi
+    include_files:
+        - docker-compose.yml
+    before_script:
+        - sh update_auth_key.sh -e live
+        - timeout 60 docker rmi kiwi:latest || true
+        - make docker-image
+        - docker tag kiwi:latest harbor.shopeemobile.com/shopee-data/kiwi:$PAYLOAD.commit_hash
+        - docker push harbor.shopeemobile.com/shopee-data/kiwi:$PAYLOAD.commit_hash
+    after_script:
+        - docker stop kiwi_web && docker rm kiwi_web
+        - docker stop kiwi_db && docker rm kiwi_db
+        - KIWI_VERSION=$PAYLOAD.commit_hash docker-compose pull
+        - KIWI_VERSION=$PAYLOAD.commit_hash docker-compose up -d

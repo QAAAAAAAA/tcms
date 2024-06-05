@@ -1,0 +1,564 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% load static %}
+{% load comments %}
+{% load extra_filters %}
+
+{% block title %}Mind map - {{ object.summary }}{% endblock %}
+{% block body_class %}cards-pf{% endblock %}
+{% block contents %}
+
+<div class="container-cards-pf">
+   <h1 class="col-md-12" style="margin-top: 0; {% if object.stop_date %}text-decoration: line-through{% endif %}">
+        <a href="{% url "testruns-get" object.pk %}">
+            <span id="test_run_pk"
+                data-pk="{{ object.pk }}"
+                data-testrun-name="{{ object.summary }}"
+                data-plan-pk="{{ object.plan_id }}"
+                data-perm-remove-tag="{{ perms.testruns.delete_testruntag }}"
+                data-perm-add-comment="{{ perms.django_comments.add_comment }}"
+                data-perm-remove-comment="{{ perms.django_comments.delete_comment }}"
+                data-trans-no-executions-selected="{% trans 'No rows selected! Please select at least one!'%}"
+                data-trans-enter-assignee-name-or-email="{% trans 'Enter username, email or user ID:'%}"
+                data-trans-are-you-sure="{% trans 'Are you sure?' %}"
+                data-trans-error-adding-cases="{% trans 'Unconfirmed test cases were not added' %}"
+                data-trans-bool-value-required="{% trans 'Type 0 or 1' %}"
+                data-trans-comment="{% trans 'Comment' %}:"
+            >TR-{{ object.pk }}:</span> {{ object.summary }}
+        </a>
+    </h1>
+
+    <div class="row row-cards-pf">
+        <div class="col-xs-12 col-sm-12 col-md-9">
+            <div class="card-pf card-pf-accented">
+                <div class="card-pf-body">
+                    <div class="mind-map-container">
+                        <div class="js-mind-map-container__backdrop">
+                            <span class="spinner"></span>
+                        </div>
+                        <div id="mindmap"></div>
+                        <div class="mind-map-container__display-toolbar">
+                            <div class="mind-map-container__display-toolbar__scale">
+                                <div class="item">
+                                    <div class="fa fa-search-minus js-mindmap_scale_down"></div>
+                                </div>
+                                <div class="mind-map-container__display-toolbar__scale-number">
+                                    <span class="js-mindmap_scale_number">100</span>%
+                                </div>
+                                <div class="item">
+                                    <div class="fa fa-search-plus js-mindmap_scale_up"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xs-12 col-sm-12 col-md-3">
+            <div class="card-pf card-pf-accented card-pf-aggregate-status">
+
+                <!-- <h2 class="card-pf-title" style="text-align: left">
+                    <span class="fa fa pficon-topology"></span>{% trans 'Test plan' %}:
+                    <a href="{% url 'test_plan_url_short' object.plan.pk %}">TP-{{ object.plan.pk }}: {{ object.plan.name }}</a>
+                </h2> -->
+
+                <h2 class="card-pf-title" style="text-align: left">
+                    <span class="fa fa-shopping-cart"></span>{% trans 'Product' %}:
+                    <a href="{% url 'testruns-search' %}?product={{ object.plan.product_id }}" title="Search test runs of {{ object.plan.product }}">{{ object.plan.product }}</a>
+                </h2>
+
+                <h2 class="card-pf-title" style="text-align: left">
+                    <span class="fa fa-random"></span>{% trans 'Version' %}:
+                    <a href="{% url 'testruns-search' %}?product={{ object.plan.product_id }}&version={{ object.plan.product_version_id }}" title="Search test runs of {{ object.plan.product_version.value }}">{{ object.plan.product_version.value }}</a>
+                </h2>
+
+                <!-- <h2 class="card-pf-title" style="text-align: left">
+                    <span class="fa fa-wrench"></span>{% trans 'Build' %}:
+                    <a href="{% url 'testruns-search' %}?product={{ object.plan.product_id }}&version={{ object.plan.product_version_id }}&build={{ object.build_id }}" title="Search test runs of {{ object.build }}">{{ object.build }}</a>
+                </h2> -->
+
+                {% if object.default_tester %}
+                    <h2 class="card-pf-title" style="text-align: left">
+                        <span class="fa fa-search"></span>{% trans 'Default tester' %}:
+                        <a href="{% url 'tcms-profile' object.default_tester.username %}">{{ object.default_tester.username }}</a>
+                    </h2>
+                {% endif %}
+
+
+                <h2 class="card-pf-title" style="text-align: left">
+                    <span class="fa fa fa-calendar-o"></span>{% trans 'Planned start' %}:
+                    {{ object.planned_start|default:'-'}}
+                </h2>
+                
+                <h2 class="card-pf-title" style="text-align: left">
+                    <span class="fa fa fa-calendar-o"></span>{% trans 'Planned stop' %}:
+                    {{ object.planned_stop|default:'-' }}
+                </h2>
+
+
+                <h2 class="card-pf-title" style="text-align: left">
+                    <span class="fa fa-calendar"></span>{% trans 'Started at' %}:
+                    <span class="start-date">
+                        {{ object.start_date|default:'-' }}
+                    </span>
+                    {% if not object.start_date %}
+                        <button class="btn btn-success btn-xs pull-right"
+                                type="button" id="start-button" title="{% trans 'Start' %}">
+                            <i class="fa fa-check" style="color: white; margin: auto"></i>
+                        </button>
+                    {% endif %}
+                </h2>
+
+            
+                <h2 class="card-pf-title" style="text-align: left; overflow: hidden;">
+                    <span class="fa fa-calendar-check-o"></span>{% trans 'Finished at' %}:
+                    <span class="stop-date">
+                        {{ object.stop_date|default:'-' }}
+                    </span>
+                    {% if not object.stop_date %}
+                        <button class="btn btn-warning btn-xs pull-right"
+                                type="button" id="stop-button" title="{% trans 'Stop' %}">
+                            <i class="fa fa-check" style="color: white; margin: auto"></i>
+                        </button>
+                    {% endif %}
+                </h2>
+
+                <div class="card-pf-body"></div>
+            </div>
+        </div>
+
+        <div class="col-xs-12 col-sm-12 col-md-3">
+            <div class="card-pf card-pf-accented card-pf-aggregate-status">
+                <h2 class="card-pf-title" style="text-align: left">
+                    <span class="fa fa-envelope"></span>
+                    {% trans "Execution Details" %}
+                </h2>
+                <div class="card-pf-body">
+                    <div class="progress hidden-print">
+                        <div class="progress-bar progress-completed progress-bar-success progress-bar-striped" role="progressbar" aria-valuemin="0" aria-valuemax="100" style="font-weight: bold;" data-toggle="tooltip"></div>
+                        <div class="progress-bar progress-bar-remaining" role="progressbar" aria-valuemin="0" aria-valuemax="100" style="font-weight: bold; color: black;" data-toggle="tooltip"></div>
+                        <div class="progress-bar progress-failed progress-bar-danger progress-bar-striped" role="progressbar" aria-valuemin="0" aria-valuemax="100" style="font-weight: bold;" data-toggle="tooltip"></div>
+                    </div>
+                    <div>
+                        <ul class="count-per-status-container list-group" style="columns: 2; margin: 0;">
+                            {% for status in execution_statuses %}
+                            <li class="list-group-item" style="padding:0; text-align:left">
+                                <label>{{ status.name }}</label> - <a id="count-for-status-{{ status.pk }}" href="#"></a>
+                            </li>
+                            {% endfor %}
+                        </ul>
+
+                        <div style="text-align: center">
+                            <label>{% trans "TOTAL" %}</label> - <a href="{% url 'testruns-get' object.pk %}" class="total-execution-count"></a>
+                        </div>
+                    </div>
+                    <div style="text-align: left">
+                        {{ object.notes|markdown2html }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xs-12 col-sm-12 col-md-3">
+            <div class="card-pf card-pf-accented card-pf-aggregate-status">
+                <h2 class="card-pf-title" style="text-align: left">
+                    <span class="fa fa-envelope"></span>
+                    {% trans "Bug Details" %}
+                </h2>
+                <div class="card-pf-body">
+                    <div class="progress hidden-print">
+                        <div class="progress-bar progress-completed-bug progress-bar-success progress-bar-striped" role="progressbar" aria-valuemin="0" aria-valuemax="100" style="font-weight: bold;" data-toggle="tooltip"></div>
+                        <div class="progress-bar progress-bar-remaining-bug" role="progressbar" aria-valuemin="0" aria-valuemax="100" style="font-weight: bold; color: black;" data-toggle="tooltip"></div>
+                        <div class="progress-bar progress-failed-bug progress-bar-danger progress-bar-striped" role="progressbar" aria-valuemin="0" aria-valuemax="100" style="font-weight: bold;" data-toggle="tooltip"></div>
+                    </div>
+                    <div>
+                        <ul class="count-per-bug-container list-group" style="columns: 2; margin: 0;">
+                        </ul>
+
+                        <div style="text-align: center">
+                            <label>{% trans "TOTAL" %}</label> - <span class="total-bug-count"> </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+    </div>
+
+    
+    <div class="mind-map__modal modal fade js-tc-detail-modal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="mind-map__modal__header">
+                <button type="button" class="close" data-dismiss="modal" aria-hidden="true">
+                    <span class="pficon pficon-close"></span>
+                </button>
+                </div>
+                <div class="modal-body js-tc-detail-body"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="mind-map__ctx-menu hidden js-ctx-menu">
+        {% if perms.testruns.change_testexecution %}
+            <div class="mind-map__ctx-menu__item dropdown dropdown-submenu">
+                <a class="js-ctx-menu-status" target=”_blank”>{% trans 'Change status' %}</a>
+                <ul class="dropdown-menu dropdown-menu-right">
+                    {% for status in execution_statuses %}
+                        <li>
+                            <span class="ctx-menu-change-status" data-status-id="{{ status.pk }}">
+                                <span class="{{ status.icon }}"></span>
+                                {{ status.name }}
+                            </span>
+                        </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endif %}
+        <div class="mind-map__ctx-menu__item js-ctx-menu-detail">
+            <a>{% trans 'Show detail modal' %}</a>
+        </div>
+        {% if perms.testruns.delete_testexecution %}
+            <div class="bg-danger mind-map__ctx-menu__item" >
+                <a class="js-ctx-menu-delete" target=”_blank”>{% trans 'Delete' %}</a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<template id="test_case_detail">
+    <div class="list-group-item js-testcase-row testcase-row">
+        <div class="list-group-item-header">
+            <div class="list-view-pf-main-info">
+                <div class="list-view-pf-body">
+                    <div class="list-view-pf-description" style="flex: 1 0 20%;">
+                        <div class="list-group-item-text">
+                            <span class="fa fa-bolt js-tc-not-in-tp hidden" title="{% trans 'Test case is not part of parent test plan' %}"></span>
+                            <span class="js-test-execution-info"></span>
+                            <a class="js-test-execution-info-link"></a>
+
+                            <p class="help-block">
+                                <span class="hidden js-row-components">
+                                    <span class="fa pficon-build" title="{% trans 'Components' %}"></span>
+                                </span>
+
+                                <span class="hidden js-row-tags">
+                                    <span class="fa fa-tags" title="{% trans 'Tags' %}"></span>
+                                </span>
+                            </p>
+                         </div>
+                    </div>
+                    <div class="list-view-pf-additional-info">
+                        <div class="list-view-pf-additional-info">
+                            <div class="list-view-pf-additional-info-item">
+                                <span class="fa js-test-execution-automated" data-automated="{% trans 'Automated' %}" data-manual="{% trans 'Manual' %}"></span>
+                            </div>
+                            <div title="{% trans 'Priority' %}" class="list-view-pf-additional-info-item">
+                                <span class="fa fa-hourglass"></span>
+                                <span class="js-test-execution-priority"></span>
+                            </div>
+                            <div title="{% trans 'Category' %}" class="list-view-pf-additional-info-item">
+                                <span class="fa fa-tag"></span>
+                                <span class="js-test-execution-category"></span>
+                            </div>
+                            <div title="{% trans 'Assigned to' %}" class="list-view-pf-additional-info-item">
+                                <span class="fa pficon-user"></span>
+                                <span class="js-test-execution-asignee"></span>
+                            </div>
+                            <div title="{% trans 'Tested by' %}" class="list-view-pf-additional-info-item">
+                                <span class="fa fa-search"></span>
+                                <span class="js-test-execution-tester"></span>
+                            </div>
+                            <div title="{% trans 'Bugs' %}" class="list-view-pf-additional-info-item js-bugs hidden">
+                                <span class="fa fa-bug" style="color:#cc0000"></span>
+                            </div>
+                        </div>
+                        <div class="list-view-pf-additional-info" style="width: 10%;">
+                            <div title="{% trans 'Status' %}" class="list-view-pf-additional-info-item">
+                                <i class="fa test-execution-status-icon"></i>
+                                <strong class="test-execution-status-name"></strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="list-group-item-container container-fluid testcase-row--max_height">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="test-execution-text-container markdown-text">
+                        <p class="js-test-execution-text"></p>
+                        <p class="js-test-execution-notes">
+                            <strong>{% trans 'Notes' %}:</strong>
+                        </p>
+                        <div class="js-test-execution-information">
+                            <span style="padding-right: 1.5rem;">
+                                <span style="font-weight: bold">
+                                    {% trans 'Run Date' %}:
+                                </span>
+                                <span class="run-date"></span>
+                            </span>
+                            <!-- <span style="padding-right: 1.5rem;">
+                                <span style="font-weight: bold">
+                                    {% trans 'Build' %}:
+                                </span>
+                                <span class="build"></span>
+                            </span> -->
+                            <span style="padding-right: 1.5rem;">
+                                <span style="font-weight: bold">
+                                    {% trans 'Text version' %}:
+                                </span>
+                                <span class="text-version"></span>
+                            </span>
+                        </div>
+                        <strong>{% trans "Bugs and hyperlinks" %}: </strong>
+                        <div>
+                            <ul class="js-test-execution-hyperlinks">
+                                <span class="spinner"></span>
+                            </ul>
+                            <template id="link-entry">
+                                <li>
+                                    <span class="link-icon"></span>
+                                    [<span class="link-status"></span>]
+                                    <a class="link-url"></a>
+                                    <a href="#"
+                                        class="bug-tooltip"
+                                        style="visibility: hidden;"
+                                        data-toggle="popover" data-html="true"
+                                        data-content="undefined"
+                                        data-trigger="focus"
+                                        data-placement="right">
+                                        <span class="fa fa-info-circle hidden-print"></span>
+                                    </a>
+                                </li>
+                            </template>
+                        </div>
+                        <strong>{% trans "History" %}: </strong>
+                        <div class="history-container">
+                            <span class="spinner"></span>
+                            <template id="history-entry">
+                                <div>
+                                    <span class="history-date"></span> <span class="history-user"></span>
+                                </div>
+                                <span class="history-change-reason"></span>
+                            </template>
+                        </div>
+
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div>
+                        <div class="comment-form hidden-print">
+                            <textarea name="text" cols="40" rows="10" id="id_text"></textarea>
+                            <input id="simplemde-file-upload" type="file" style="display: none">
+                            <div class="form-group" style="padding: 15px; text-align: right; display: flex; justify-content: flex-end;">
+                                <span class="status-buttons">
+                                    {% for status in execution_statuses%}
+                                    <i class="{{ status.icon }} change-status-button" title="{{ status.name }}" style="font-size: 28px; margin-right: 10px; cursor: pointer; color:{{ status.color }}" data-status-id="{{ status.id }}"></i>
+                                    {% endfor %}
+                                </span>
+                                <button class="btn btn-default post-comment">{% trans "Save" %}</button>
+                            </div>
+                        </div>
+                        <strong>{% trans "Comments" %}:</strong>
+                        <div class="comments">
+                            <span class="spinner"></span>
+                        </div>
+                    </div>
+                    <div>
+                        <span>{% trans 'Attachments' %}:</span>
+                        <ul class="list-group list-unstyled js-test-case-attachments">
+                            <span class="spinner"></span>
+                            <template id="attachments-list-item">
+                                <li class="list-group-item'">
+                                    <a></a>
+                                </li>
+                            </template>
+                            <li class="list-group-item hidden">{% trans "No attachments" %}</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+
+{% include 'include/comments_for_object_template.html' %}
+
+<script src="{% static 'typeahead.js/dist/typeahead.jquery.min.js' %}"></script>
+<script src="{% static 'bootstrap-switch/dist/js/bootstrap-switch.min.js' %}"></script>
+<script src="{% static 'bootstrap-select/dist/js/bootstrap-select.min.js' %}"></script>
+<script src="{% static 'moment/min/moment.min.js' %}"></script>
+<script src="{% static 'moment-timezone/builds/moment-timezone-with-data.min.js' %}"></script>
+
+<script src="{% static 'js/bugs.js' %}"></script>
+<script src="{% static 'js/utils.js' %}"></script>
+<script src="{% static 'js/jsonrpc.js' %}"></script>
+<script src="{% static 'js/tags.js' %}"></script>
+<script src="{% static 'js/simpleMindMap.umd.js' %}"></script>
+<script src="{% static 'js/mind_map.js' %}"></script>
+<script src="{% static 'testruns/js/mind_map_get.js' %}"></script> 
+
+{{ comment_form.media }}
+
+<style>
+.mind-map-container {
+    position: relative;
+    height: 90vh;
+    overflow: hidden;
+}
+
+#mindmap {
+    position: absolute;
+    left: 0px;
+    top: 0px;
+    width: 100%;
+    height: 100%;
+}
+
+.mind-map-container__display-toolbar,
+.mind-map-container__toolbar {
+    top: 0;
+    left: 0;
+    z-index: 1;
+    position: absolute;
+    background-color: #fff;
+    padding: 10px 20px;
+    border-radius: 6px;
+    box-shadow: 0 2px 16px 0 rgb(0 0 0 / 6%);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    margin-right: 20px;
+}
+
+.mind-map-container__display-toolbar {
+    bottom: 0;
+    right: 0;
+    top: unset;
+    left: unset;
+    margin-left: 20px;
+    margin-right: 0;
+    background: hsla(0, 0%, 100%, 0.8);
+    opacity: 0.8;
+}
+
+.mind-map-container__display-toolbar__scale {
+    display: flex;
+}
+
+.mind-map-container__display-toolbar__scale-number {
+    margin: 0 20px
+}
+
+.mind-map-container__display-toolbar__scale .fa {
+    cursor: pointer;
+}
+
+.js-mind-map-container__backdrop {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background: rgba(162, 162, 162, 0.5);
+    z-index: 2;
+}
+
+.js-mind-map-container__backdrop .spinner {
+    width: 30px;
+    height: 30px;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.mind-map__test-case__body {
+    overflow-y: auto;
+    overflow-x: hidden;
+    min-height: 60vh;
+    max-height: 60vh
+}
+
+.mind-map__ctx-menu {
+    position: absolute;
+    width: 200px;
+    background: #fff;
+    box-shadow: 0 4px 12px 0 hsl(0deg 0% 69% / 50%)
+}
+
+.mind-map__ctx-menu__item > a {
+    padding: 4px 16px;
+    margin: 2px 0;
+    display: block;
+    line-height: 1.66666667;
+    color: #363636;
+    white-space: nowrap;
+    font-weight: 400;
+}
+
+.mind-map__ctx-menu__item:hover {
+    background: #f5f5f5;
+    cursor: pointer;
+}
+
+.mind-map__ctx-menu__item a:hover,
+.mind-map__ctx-menu__item a:active,
+.mind-map__ctx-menu__item a:focus {
+    text-decoration: none;
+}
+
+.mind-map__modal .modal-lg {
+    min-width: 80vw;
+}
+
+.mind-map__modal__header {
+    border-bottom: none;
+    padding: 10px 18px;
+}
+
+.mind-map__modal .spinner {
+    display: inline-block;
+}
+
+.mind-map-container__display-toolbar__scale-number {
+    width: 40px;
+    text-align: center;
+}
+
+.ctx-menu-change-status.active {
+    color: #4d5258;
+    text-decoration: none;
+    background-color: #def3ff;
+    border-color: #bee1f4;
+}
+
+.ctx-menu-change-status {
+    position: relative;
+    display: block;
+    padding: 1px 10px;
+    border-style: solid;
+    border-width: 1px 0;
+    border-color: transparent;
+}
+
+.ctx-menu-change-status:hover {
+    border-color: #bee1f4;
+    color: #4d5258;
+    text-decoration: none;
+    background-color: #def3ff;
+}
+
+.ctx-menu-change-status .spinner {
+    height: 13px;
+    width: 13px;
+    position: absolute;
+    right: 12px;
+    top: 20%;
+}
+
+.testcase-row--max_height {
+    max-height: 60vh;
+    overflow: auto;
+}
+
+</style>
+{% endblock %}

@@ -1,0 +1,399 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% load static %}
+{% load extra_filters %}
+{% load attachments_tags %}
+{% block title %}Mind map{% endblock %}
+{% block body_class %}cards-pf{% endblock %}
+{% block contents %}
+
+<div class="container-cards-pf">
+    <h1 class="col-md-12" style="margin-top: 0">
+        {% if not object.is_active %}<s>{% endif %}
+        <a href="{% url "test_plan_url_short" object.pk %}">
+            <span id="test_plan_pk"
+                  data-testplan-pk="{{ object.pk }}"
+                  data-testplan-name="{{ object.name }}"
+                  data-perm-remove-tag="{{ perms.testplans.delete_testplantag }}"
+                  data-perm-change-testcase="{{ perms.testcases.change_testcase }}"
+                  data-perm-remove-testcase="{{ perms.testcases.delete_testcaseplan }}"
+                  data-perm-add-testcase="{{ perms.testcases.add_testcase }}"
+                  data-perm-add-comment="{{ perms.django_comments.add_comment }}"
+                  data-perm-delete-comment="{{ perms.django_comments.delete_comment }}"
+                  data-trans-username-email-prompt="{% trans 'Enter username, email or user ID:' %}"
+                  data-trans-no-testcases-selected="{% trans 'No rows selected! Please select at least one!'%}"
+                  data-trans-are-you-sure="{% trans 'Are you sure?' %}"
+                  data-trans-cannot-create-testrun="{% trans 'Cannot create TestRun with unconfirmed test cases'%}"
+                  data-trans-error-adding-cases="{% trans 'Error adding test cases' %}"
+            >TP-{{ object.pk }}:</span> {{ object.name }}
+        </a>
+        {% if not object.is_active %}</s>{% endif %}
+    </h1>
+
+    <div class="row row-cards-pf">
+        <div class="col-xs-12 col-sm-12 col-md-9">
+
+            <div class="card-pf card-pf-accented">
+                <div class="card-pf-body">
+                    <div class="mind-map-container">
+                        <div id="mindmap"></div>
+                        <div class="mind-map-container__display-toolbar">
+                            <div class="mind-map-container__display-toolbar__scale">
+                                <div class="item">
+                                    <div class="fa fa-search-minus js-mindmap_scale_down"></div>
+                                </div>
+                                <div class="mind-map-container__display-toolbar__scale-number">
+                                    <span class="js-mindmap_scale_number">100</span>%
+                                </div>
+                                <div class="item">
+                                    <div class="fa fa-search-plus js-mindmap_scale_up"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mind-map__modal modal fade js-tc-detail-modal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="mind-map__modal__header">
+                    <button type="button" class="close" data-dismiss="modal" aria-hidden="true">
+                        <span class="pficon pficon-close"></span>
+                    </button>
+                    </div>
+                    <div class="modal-body js-tc-detail-body"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="mind-map__ctx-menu hidden js-ctx-menu">
+            <div class="mind-map__ctx-menu__item" >
+                <a class="js-ctx-menu-clone" target=”_blank”>{% trans 'Clone' %}</a>
+            </div>
+            <div class="mind-map__ctx-menu__item" >
+                <a class="js-ctx-menu-edit" target=”_blank”>{% trans 'Edit' %}</a>
+            </div>
+            <div class="mind-map__ctx-menu__item js-ctx-menu-detail">{% trans 'Show detail modal' %}</div>
+        </div>
+        <div class="col-xs-12 col-sm-12 col-md-3 testplan-info">
+            <div class="card-pf card-pf-accented card-pf-aggregate-status" style="text-align: left">
+
+                <h2 class="card-pf-title">
+                    <span class="fa fa-wrench"></span>{% trans 'Reverse Active Status' %}:
+                    <button class="btn btn-primary btn-xs pull-right"
+                            type="button" id="active-button" onclick="change_testplan_status(event)">
+                        <i class="fa fa-check" style="color: white; margin: auto"></i>
+                    </button>
+                </h2>
+
+                <h2 class="card-pf-title">
+                    <span class="fa pficon-user"></span>{% trans 'Author' %}:
+                    <a href="{% url "tcms-profile" object.author.username %}">{{ object.author.username }}</a>
+                </h2>
+
+                <h2 class="card-pf-title">
+                    <span class="fa fa-calendar"></span>{{ object.create_date }}
+                </h2>
+
+                <h2 class="card-pf-title">
+                <span id="product_pk"
+                      class="fa fa-shopping-cart"></span>{% trans 'Product' %}:
+                    <a href="{% url "plans-search" %}?product={{ object.product_id }}"
+                       title="Search plans of {{ object.product }} ">{{ object.product }}</a>
+                </h2>
+
+                <h2 class="card-pf-title">
+                    <span class="fa fa-random"></span>{% trans 'Version' %}:
+                    {{ object.product_version.value }}
+                </h2>
+
+                <h2 class="card-pf-title">
+                    <span class="fa fa-cube"></span>{% trans 'Plan Type' %}:
+                    {{ object.type.name  }}
+                </h2>
+
+                <h2 class="card-pf-title">
+                    <span class="fa fa-link"></span>{% trans 'Reference link' %}:
+                    {% if object.extra_link %}
+                        <a href="{{ object.extra_link }}">{{ object.extra_link }}</a>
+                    {% else %}
+                        -
+                    {% endif %}
+                </h2>
+
+                <div class="card-pf-body" style="margin-top:0">
+                    {{ object.tree_view_html|safe }}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<template id="test_case_detail">
+    <div class="list-group-item js-testcase-row" data-testcase-pk="">
+        <div class="list-view-pf-main-info">
+            <div class="list-view-pf-actions" style="margin-top: 0; margin-bottom: 0;">
+                <div class="dropdown pull-right dropdown-kebab-pf">
+                    <button class="btn btn-link dropdown-toggle" type="button"
+                            data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
+                        <span class="fa fa-ellipsis-v"></span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-right">
+                    {% if perms.testcases.add_testcase %}
+                        <li><a target=”_blank” class="js-test-case-detail-menu-clone">{% trans 'Clone' %}</a></li>
+                        <li class="divider"></li>
+                    {% endif %}
+                    {% if perms.testcases.change_testcase %}
+                        <li class="dropdown-submenu dropdown-menu-left">
+                            <a tabindex="-1" href="#">{% trans 'Status' %}</a>
+                            <ul class="dropdown-menu js-test-case-detail-menu-status">
+                                {% for status in statuses %}
+                                    <li><a data-id="{{ status.id }}" href="#">{{ status.name }}</a></li>
+                                {% endfor %}
+                            </ul>
+                        </li>
+                        <li class="dropdown-submenu dropdown-menu-left">
+                            <a tabindex="-1" href="#">{% trans 'Priority' %}</a>
+                            <ul class="dropdown-menu js-test-case-detail-menu-priority">
+                                {% for priority in priorities %}
+                                    <li><a data-id="{{ priority.id }}" href="#">{{ priority.value }}</a></li>
+                                {% endfor %}
+                            </ul>
+                        </li>
+                        <li><a class="js-test-case-detail-menu-tester" href="#">{% trans 'Default tester' %}</a></li>
+                        <li class="divider"></li>
+                        <li><a target=”_blank” class="js-test-case-detail-menu-edit">{% trans 'Edit' %}</a></li>
+                        <li class="divider"></li>
+                    {% endif %}
+                    {% if perms.testcases.delete_testcaseplan %}
+                        <li><a class="js-test-case-detail-menu-delete bg-danger" href="#">{% trans 'Delete' %}</a></li>
+                    {% endif %}
+                    </ul>
+                </div>
+            </div>
+            <div class="list-view-pf-body">
+                <div class="list-view-pf-description">
+                    <div class="list-group-item-text">
+                        <a class="js-test-case-link"></a>
+                    </div>
+                </div>
+                <div class="list-view-pf-additional-info">
+                    <div title="{% trans 'Status' %}" class="list-view-pf-additional-info-item">
+                        <!-- add customizable icon as part of #1932 -->
+                        <span class="js-test-case-status-icon fa"></span>
+                        <span class="js-test-case-status"></span>
+                    </div>
+                    <div class="list-view-pf-additional-info-item">
+                        <span class="fa fa-cog fa-thumbs-up js-test-case-automated" data-true="{% trans 'Automated' %}" data-false="{% trans 'Manual' %}"></span>{# one of the classes is removed by the js #}
+                    </div>
+                    <div title="{% trans 'Priority' %}" class="list-view-pf-additional-info-item">
+                        <span class="fa fa-hourglass"></span>
+                        <span class="js-test-case-priority"></span>
+                    </div>
+                    <div title="{% trans 'Category' %}" class="list-view-pf-additional-info-item">
+                        <span class="fa fa-tag"></span>
+                        <span class="js-test-case-category"></span>
+                    </div>
+                    <div title="{% trans 'Author' %}" class="list-view-pf-additional-info-item">
+                        <span class="fa pficon-user"></span>
+                        <span class="js-test-case-author"></span>
+                    </div>
+                    <div title="{% trans 'Default tester' %}" class="list-view-pf-additional-info-item js-test-case-tester-div">
+                        <span class="fa fa-search"></span>
+                        <span class="js-test-case-tester"></span>
+                    </div>
+
+                    <div title="{% trans 'Reviewer' %}" class="list-view-pf-additional-info-item js-test-case-reviewer-div hidden">
+                        <span class="fa fa-history"></span>
+                        <span class="js-test-case-reviewer"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="list-group-item-container container-fluid mind-map__test-case__body">
+            <div class="row">
+                <div class="col-md-9">
+                    <div class="markdown-text js-test-case-expand-text"></div>
+                    <strong>{% trans 'Notes' %}:</strong>
+                    <p class="js-test-case-expand-notes">{% trans 'Notes' %}</p>
+                </div>
+                <div class="col-md-3 text-center">
+                    <span>{% trans 'Attachments' %}:</span>
+                    <ul class="list-group list-unstyled js-test-case-expand-attachments">
+                        <span class="spinner"></span>
+                        <template id="attachments-list-item">
+                            <li class="list-group-item">
+                                <a></a>
+                            </li>
+                        </template>
+                        <li class="list-group-item hidden">{% trans "No attachments" %}</li>
+                    </ul>
+
+                    <span>{% trans 'Components' %}:</span>
+                    <ul class="list-inline js-testcase-expand-components">
+                        <template>
+                            <li>
+                                <span class="label label-default"></span>
+                            </li>
+                        </template>
+                    </ul>
+
+                    <span>{% trans 'Tags' %}:</span>
+                    <ul class="list-inline js-testcase-expand-tags">
+                        <span class="spinner"></span>
+                        <template>
+                            <li>
+                                <span class="label label-default"></span>
+                            </li>
+                        </template>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <strong>{% trans 'Comments' %}:</strong>
+                    <div class="comments">
+                        <span class="spinner"></span>
+                    </div>
+                </div>
+
+                <div class="col-md-6 js-comment-form-textarea">
+                    <textarea name="text" cols="40" rows="10" id="id_text"></textarea>
+                    <input id="simplemde-file-upload" type="file" style="display: none">
+                    <button type="submit" name="action" class="btn btn-default js-post-comment">
+                    {% trans "Save" %}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+
+{% include 'include/comments_for_object_template.html' %}
+
+<script src="{% static 'typeahead.js/dist/typeahead.jquery.min.js' %}"></script>
+
+<script src="{% static 'js/utils.js' %}"></script>
+<script src="{% static 'js/jsonrpc.js' %}"></script>
+<script src="{% static 'js/tags.js' %}"></script>
+<script src="{% static 'js/simpleMindMap.umd.js' %}"></script>
+<script src="{% static 'js/mind_map.js' %}"></script>
+<script src="{% static 'testplans/js/mind_map_get.js' %}"></script> 
+
+{{ comment_form.media }}
+
+<style>
+.mind-map-container {
+    position: relative;
+    height: 90vh;
+    overflow: hidden;
+}
+
+#mindmap {
+    position: absolute;
+    left: 0px;
+    top: 0px;
+    width: 100%;
+    height: 100%;
+}
+
+.mind-map-container__display-toolbar,
+.mind-map-container__toolbar {
+    top: 0;
+    left: 0;
+    z-index: 1039;
+    position: absolute;
+    background-color: #fff;
+    padding: 10px 20px;
+    border-radius: 6px;
+    box-shadow: 0 2px 16px 0 rgb(0 0 0 / 6%);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    margin-right: 20px;
+}
+
+.mind-map-container__display-toolbar {
+    bottom: 0;
+    right: 0;
+    top: unset;
+    left: unset;
+    margin-left: 20px;
+    margin-right: 0;
+    background: hsla(0, 0%, 100%, 0.8);
+    opacity: 0.8;
+}
+
+.mind-map-container__display-toolbar__scale {
+    display: flex;
+}
+
+.mind-map-container__display-toolbar__scale-number {
+    margin: 0 20px
+}
+
+.mind-map-container__display-toolbar__scale .fa {
+    cursor: pointer;
+}
+
+.mind-map__test-case__body {
+    overflow-y: auto;
+    overflow-x: hidden;
+    min-height: 60vh;
+    max-height: 60vh
+}
+
+.mind-map__ctx-menu {
+    position: absolute;
+    width: 200px;
+    background: #fff;
+    box-shadow: 0 4px 12px 0 hsl(0deg 0% 69% / 50%)
+}
+
+.mind-map__ctx-menu__item {
+    padding: 4px 16px;
+    margin: 2px 0;
+}
+
+.mind-map__ctx-menu__item:hover {
+    background: #f5f5f5;
+    cursor: pointer;
+}
+
+.mind-map__ctx-menu__item a {
+    display: block;
+    padding: 0;
+    clear: both;
+    font-weight: 400;
+    line-height: 1.66666667;
+    color: #363636;
+    white-space: nowrap;
+}
+
+.mind-map__ctx-menu__item a:hover,
+.mind-map__ctx-menu__item a:active,
+.mind-map__ctx-menu__item a:focus {
+    text-decoration: none;
+}
+
+.mind-map__modal .modal-lg {
+    min-width: 80vw;
+}
+
+.mind-map__modal__header {
+    border-bottom: none;
+    padding: 10px 18px;
+}
+
+.mind-map__modal .spinner {
+    display: inline-block;
+}
+
+.mind-map-container__display-toolbar__scale-number {
+    width: 40px;
+    text-align: center;
+}
+
+</style>
+{% endblock %}
